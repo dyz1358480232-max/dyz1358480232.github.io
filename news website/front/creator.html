@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新闻创作者平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .editor-toolbar button:hover {
+            @apply bg-blue-100;
+        }
+        .news-item:hover {
+            @apply shadow-lg transform -translate-y-1 transition-all;
+        }
+        .category-select {
+            @apply w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-blue-600">新闻创作者平台</h1>
+            <p class="text-gray-500">发布新闻，实时同步到读者端</p>
+        </div>
+    </header>
+
+    <!-- 主体内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 左侧：富文本编辑器 -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">发布新闻</h2>
+                
+                <!-- 新闻分类选择 -->
+                <select id="newsCategory" class="category-select">
+                    <option value="家居">家居</option>
+                    <option value="运动">运动</option>
+                    <option value="商业">商业</option>
+                    <option value="创新">创新</option>
+                    <option value="文化">文化</option>
+                    <option value="艺术">艺术</option>
+                    <option value="旅行">旅行</option>
+                    <option value="地球">地球</option>
+                </select>
+                
+                <!-- 新闻标题输入框 -->
+                <input 
+                    type="text" 
+                    id="newsTitle" 
+                    placeholder="请输入新闻标题（必填）" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                
+                <!-- 富文本工具栏 -->
+                <div class="editor-toolbar flex gap-2 mb-4 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <button id="boldBtn" class="px-3 py-1 border border-gray-300 rounded hover:cursor-pointer">
+                        <b>B</b>
+                    </button>
+                    <button id="italicBtn" class="px-3 py-1 border border-gray-300 rounded hover:cursor-pointer">
+                        <i>I</i>
+                    </button>
+                    <button id="fontSizeBtn" class="px-3 py-1 border border-gray-300 rounded hover:cursor-pointer">
+                        Aa
+                    </button>
+                    <div class="h-6 w-px bg-gray-300 mx-1"></div>
+                    <label for="imageUpload" class="px-3 py-1 bg-blue-500 text-white rounded hover:cursor-pointer">
+                        上传图片
+                    </label>
+                    <input type="file" id="imageUpload" accept="image/*" class="hidden">
+                    <span id="uploadStatus" class="ml-2 text-sm text-gray-500"></span>
+                </div>
+                
+                <!-- 富文本编辑区 -->
+                <div 
+                    id="contentEditor" 
+                    contenteditable="true" 
+                    class="w-full min-h-[300px] px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="请输入新闻内容（必填，支持图文混排）"
+                ></div>
+                
+                <!-- 发布按钮 -->
+                <button id="publishBtn" class="mt-6 w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    发布新闻
+                </button>
+            </div>
+
+            <!-- 右侧：已发布新闻列表 -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">已发布新闻</h2>
+                <div id="newsList" class="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                    <!-- 新闻条目会通过JS动态生成 -->
+                    <p class="text-gray-500 text-center py-8">暂无已发布新闻</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 1. 初始化数据（从localStorage读取，没有则初始化）
+        let newsData = JSON.parse(localStorage.getItem('newsData')) || [];
+
+        // 2. DOM元素获取
+        const newsCategory = document.getElementById('newsCategory');
+        const newsTitle = document.getElementById('newsTitle');
+        const contentEditor = document.getElementById('contentEditor');
+        const boldBtn = document.getElementById('boldBtn');
+        const italicBtn = document.getElementById('italicBtn');
+        const fontSizeBtn = document.getElementById('fontSizeBtn');
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const publishBtn = document.getElementById('publishBtn');
+        const newsList = document.getElementById('newsList');
+
+        // 3. 富文本编辑功能
+        // 加粗
+        boldBtn.addEventListener('click', () => {
+            document.execCommand('bold', false, null);
+            contentEditor.focus();
+        });
+        // 斜体
+        italicBtn.addEventListener('click', () => {
+            document.execCommand('italic', false, null);
+            contentEditor.focus();
+        });
+        // 字体大小切换
+        fontSizeBtn.addEventListener('click', () => {
+            const sizes = ['1', '2', '3', '4', '5', '6', '7'];
+            const currentSize = document.queryCommandValue('fontSize') || '3';
+            const newSize = sizes[(sizes.indexOf(currentSize) + 1) % sizes.length];
+            document.execCommand('fontSize', false, newSize);
+            contentEditor.focus();
+        });
+
+        // 4. 图片上传功能（转换为Base64存储，无需后端）
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                uploadStatus.textContent = '❌ 请上传图片文件（jpg/png/gif）';
+                uploadStatus.classList.add('text-red-500');
+                setTimeout(() => {
+                    uploadStatus.textContent = '';
+                    uploadStatus.classList.remove('text-red-500');
+                }, 3000);
+                return;
+            }
+
+            // 读取图片为Base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = document.createElement('img');
+                img.src = event.target.result;
+                img.style.maxWidth = '100%';
+                img.style.margin = '1rem 0';
+
+                // 插入到光标位置
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(img);
+                    range.setStartAfter(img);
+                    range.setEndAfter(img);
+                    selection.removeAllRanges();
+                    selection.addRange(range);2241
+                } else {
+                    contentEditor.appendChild(img);
+                }
+
+               33333333 uploadStatus.textContent = '✅ 图片上传成功';
+                uploadStatus.classList.add('text-green-500');
+                imageUpload.value = ''; // 重置文件输入，允许重复上传同一张图
+                setTimeout(() => {
+                    uploadStatus.textContent = '';
+                    uploadStatus.classList.remove('text-green-500');
+                }, 3000);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 5. 发布新闻功能
+        publishBtn.addEventListener('click', () => {
+            const category = newsCategory.value;
+            const title = newsTitle.value.trim();
+            const content = contentEditor.innerHTML.trim();
+
+            // 校验必填项
+            if (!title) {
+                alert('❌ 请输入新闻标题');
+                newsTitle.focus();
+                return;
+            }
+            if (!content) {
+                alert('❌ 请输入新闻内容');
+                contentEditor.focus();
+                return;
+            }
+
+            // 构建新闻数据
+            const newNews = {
+                id: Date.now(), // 用时间戳作为唯一ID
+                category: category,
+                title: title,
+                content: content,
+                publishTime: new Date().toLocaleString('zh-CN', { 
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                }),
+                likeCount: 0, // 初始点赞数为0
+                comments: [] // 初始评论为空
+            };
+
+            // 保存到localStorage（添加到数组开头，实现最新新闻在最前面）
+            newsData.unshift(newNews);
+            localStorage.setItem('newsData', JSON.stringify(newsData));
+
+            // 重置编辑器
+            newsTitle.value = '';
+            contentEditor.innerHTML = '';
+
+            // 刷新已发布新闻列表
+            renderNewsList();
+
+            // 提示发布成功
+            alert('✅ 新闻发布成功！已实时同步到读者端');
+        });
+
+        // 6. 渲染已发布新闻列表
+        function renderNewsList() {
+            if (newsData.length === 0) {
+                newsList.innerHTML = '<p class="text-gray-500 text-center py-8">暂无已发布新闻</p>';
+                return;
+            }
+
+            newsList.innerHTML = '';
+            newsData.forEach(news => {
+                // 生成分类标签颜色
+                const categoryColor = {
+                    家居: 'brown-500',
+                    运动: 'green-500',
+                    商业: 'blue-500',
+                    创新: 'purple-500',
+                    文化: 'orange-500',
+                    艺术: 'pink-500',
+                    旅行: 'teal-500',
+                    地球: 'indigo-500'
+                }[news.category] || 'gray-500';
+
+                const newsItem = document.createElement('div');
+                newsItem.className = 'news-item p-4 border border-gray-200 rounded-lg';
+                newsItem.innerHTML = `
+                    <span class="inline-block px-2 py-1 bg-${categoryColor} text-white text-xs rounded-full mb-2">${news.category}</span>
+                    <h3 class="font-medium text-gray-800 mb-1">${news.title}</h3>
+                    <div class="text-sm text-gray-500 mb-2">
+                        发布时间：${news.publishTime} | 
+                        分类：${news.category} |
+                        点赞数：${news.likeCount} | 
+                        评论数：${news.comments.length}
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        内容预览：${news.content.replace(/<[^>]+>/g, '').slice(0, 100)}...
+                    </div>
+                `;
+                newsList.appendChild(newsItem);
+            });
+        }
+
+        // 7. 初始化编辑器占位符
+        contentEditor.addEventListener('focus', () => {
+            if (contentEditor.innerHTML.trim() === '') {
+                contentEditor.innerHTML = '';
+            }
+        });
+        contentEditor.addEventListener('blur', () => {
+            if (contentEditor.innerHTML.trim() === '') {
+                contentEditor.innerHTML = '请输入新闻内容（必填，支持图文混排）';
+                contentEditor.classList.add('text-gray-400');
+            }
+        });
+        if (contentEditor.innerHTML.trim() === '') {
+            contentEditor.innerHTML = '请输入新闻内容（必填，支持图文混排）';
+            contentEditor.classList.add('text-gray-400');
+        }
+
+        // 8. 监听localStorage变化（如果读者端修改了点赞/评论，这里实时更新）
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'newsData') {
+                newsData = JSON.parse(e.newValue) || [];
+                renderNewsList();
+            }
+        });
+
+        // 9. 页面加载时渲染新闻列表
+        renderNewsList();
+    </script>
+</body>
+</html>
